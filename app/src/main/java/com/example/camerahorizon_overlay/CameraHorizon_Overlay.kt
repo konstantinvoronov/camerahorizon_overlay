@@ -1,5 +1,7 @@
 package com.example.camerahorizon_overlay
 
+import android.R.attr.radius
+import android.R.bool
 import android.app.Activity
 import android.content.Context
 import android.graphics.*
@@ -12,10 +14,7 @@ import android.media.ToneGenerator
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
-import kotlin.math.PI
-import kotlin.math.atan2
-import kotlin.math.round
-import kotlin.math.sqrt
+import kotlin.math.*
 
 
 /**
@@ -63,29 +62,54 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
     private val ssz: TextView
     private val spitch: TextView
     private val sroll: TextView
+    private val syaw: TextView
 
     private val toneGenerator: ToneGenerator
     private val canvasY: Canvas
     private val canvasX: Canvas
+    private val canvasLevelSquare: Canvas
     private val rectangleY: Rect
     private val rectangleX: Rect
     private val paintRectangle: Paint
+
     private val bitmapVertical: Bitmap
     private val bitmapHorizontal: Bitmap
+    private val bitmapLevelSquare: Bitmap
+
     private val mImageViewY: ImageView
     private val mImageViewX: ImageView
+    private val mlevelsquare: ImageView
     private val paintLine: Paint
     var isCameraEnabled: Boolean
         private set
     private var tonePlayed: Boolean
     private var thetaX: Double
     private var thetaY: Double
+    private var thetaZ: Double = 0.0
 
 
     private val accelerometerReading = FloatArray(3)
     private val magnetometerReading = FloatArray(3)
     private val rotationMatrix = FloatArray(9)
     private val orientationAngles = FloatArray(3)
+
+
+    private fun drawHorizonLevel(angle: Double) {
+        val Width = 300
+        val Height = 300
+
+        val handRadius: Int = 298
+
+        canvasLevelSquare.drawLine(
+            abs((sin(Math.toRadians(angle))* (Width/2)).toFloat()),
+            (((handRadius/2) + (sin(Math.toRadians(angle))* (handRadius/2))).toFloat()),
+
+            (Width - abs(sin(Math.toRadians(angle))* (Width/2))-1).toFloat(),
+            (((handRadius/2) - (sin(Math.toRadians(angle))* (handRadius/2)))-1).toFloat(),
+            paintLine
+        )
+    }
+
 
     override fun onSensorChanged(sensorEvent: SensorEvent) {
 
@@ -105,14 +129,17 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
             if (sensorEvent.values[0] > GRAVITY) GRAVITY else sensorEvent.values[0].toDouble()
         var gy =
             if (sensorEvent.values[1] > GRAVITY) GRAVITY else sensorEvent.values[1].toDouble()
-        val gz = sensorEvent.values[2].toDouble()
+        var gz = sensorEvent.values[2].toDouble()
+        if (sensorEvent.values[2] > GRAVITY) GRAVITY else sensorEvent.values[2].toDouble()
 
         gx = if (gx < -GRAVITY) -GRAVITY else gx
         gy = if (gy < -GRAVITY) -GRAVITY else gy
+        gz = if (gz < -GRAVITY) -GRAVITY else gz
 
         // another pitch and roll
         thetaX = round(Math.toDegrees(Math.asin(gx / GRAVITY)) * 100) / 100 // pitch 0-90 looking up or down when 0 camera is facing earth or sky when closer to 90 facing horizon
         thetaY = round(Math.toDegrees(Math.asin(gy / GRAVITY)) * 100) / 100 // roll 0-90
+        thetaZ = round(Math.toDegrees(Math.asin(gz / GRAVITY)) * 100) / 100 // roll 0-90
 
         /* calculations from https://wiki.dfrobot.com/How_to_Use_a_Three-Axis_Accelerometer_for_Tilt_Sensing */
 
@@ -139,6 +166,7 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
 
         spitch.setText((pitch*100/100).toString())
         sroll.setText((roll*100/100).toString())
+        syaw.setText((thetaZ*100/100).toString())
 
 
         //      Log.d(TAG,"sx: ${gx} sy: ${gy} sz: ${gz} thetaX: ${thetaX} thetaY ${thetaY} roll:${roll} pitch:${pitch} roll2:${roll2} pitch2:${pitch2}")
@@ -149,6 +177,9 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
 
         canvasY.drawRect(rectangleY, paintRectangle)
         canvasX.drawRect(rectangleX, paintRectangle)
+        canvasLevelSquare.drawColor(Color.WHITE)
+        drawHorizonLevel(pitch)
+
 // roll 90 pitch 0 - landscape orintation faceing horizon
         // roll 0 p 0 - facing bottom or sky
         // roll 90 piych 0 albom orientation facing horizon
@@ -196,8 +227,11 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
             canvasX.height.toFloat(),
             paintLine
         )
+
         mImageViewY.setImageBitmap(bitmapVertical)
         mImageViewX.setImageBitmap(bitmapHorizontal)
+        mlevelsquare.setImageBitmap(bitmapLevelSquare)
+
         if (thetaX >= MIN_DEGREE && thetaX <= MAX_DEGREE && thetaY >= MIN_DEGREE && thetaY <= MAX_DEGREE && gz > 0.0) {
             isCameraEnabled = true
             userMessage.setBackgroundColor(Color.GREEN)
@@ -270,10 +304,9 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
     }
 
     init {
-        mImageViewY =
-            (ctx as Activity).findViewById<View>(R.id.iv) as ImageView
-        mImageViewX =
-            ctx.findViewById<View>(R.id.ihorizintal) as ImageView
+        mImageViewY = (ctx as Activity).findViewById<View>(R.id.iv) as ImageView
+        mImageViewX = ctx.findViewById<View>(R.id.ihorizintal) as ImageView
+        mlevelsquare = ctx.findViewById<View>(R.id.levelsquare) as ImageView
 
         userMessage =
             ctx.findViewById<View>(R.id.user_message) as TextView
@@ -285,6 +318,7 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
 
         spitch = ctx.findViewById<View>(R.id.roll) as TextView
         sroll = ctx.findViewById<View>(R.id.pitch) as TextView
+        syaw = ctx.findViewById<View>(R.id.yaw) as TextView
 
         toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
 
@@ -299,9 +333,18 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
             50,  // Height
             Bitmap.Config.ARGB_8888 // Config
         )
+
+        bitmapLevelSquare = Bitmap.createBitmap(
+            300,  // Width
+            300,  // Height
+            Bitmap.Config.ARGB_8888 // Config
+        )
+
         canvasY = Canvas(bitmapVertical)
         canvasY.drawColor(Color.LTGRAY)
         canvasX = Canvas(bitmapHorizontal)
+        canvasLevelSquare = Canvas(bitmapLevelSquare)
+
         canvasY.drawColor(Color.LTGRAY)
         rectangleY = Rect(0, 0, canvasY.width, canvasY.height)
         rectangleX = Rect(0, 0, canvasX.width, canvasX.height)
