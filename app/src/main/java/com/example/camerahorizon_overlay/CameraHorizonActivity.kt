@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
+import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -182,6 +183,10 @@ class CameraHorizonActivity : AppCompatActivity() {
                 // Bind use cases to camera
                 camera = cameraProvider.bindToLifecycle(
                     this, cameraSelector, preview, imageCapture,imageAnalyzer)
+
+
+                //CameraManagerCompat.from(this).unwrap().getCameraCharacteristics("1").get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+
                 preview?.setSurfaceProvider(viewfinder.createSurfaceProvider(camera?.cameraInfo))
             } catch(exc: Exception) {
                 Log.d(TAG, "ERROR: Use case binding failed: $exc")
@@ -190,5 +195,20 @@ class CameraHorizonActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
 
     }
-
+    /**
+     * We need a display listener for orientation changes that do not trigger a configuration
+     * change, for example if we choose to override config change in manifest or for 180-degree
+     * orientation changes.
+     */
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+        override fun onDisplayRemoved(displayId: Int) = Unit
+        override fun onDisplayChanged(displayId: Int) = view?.let { view ->
+            if (displayId == this@CameraFragment.displayId) {
+                Log.d(TAG, "Rotation changed: ${view.display.rotation}")
+//                imageCapture?.targetRotation = view.display.rotation
+  //              imageAnalyzer?.targetRotation = view.display.rotation
+            }
+        } ?: Unit
+    }
 }

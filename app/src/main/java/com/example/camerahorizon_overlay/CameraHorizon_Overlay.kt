@@ -1,7 +1,6 @@
 package com.example.camerahorizon_overlay
 
-import android.R.attr.radius
-import android.R.bool
+
 import android.app.Activity
 import android.content.Context
 import android.graphics.*
@@ -29,29 +28,18 @@ import kotlin.math.*
    https://www.raywenderlich.com/10838302-sensors-tutorial-for-android-getting-started
 
 
-    some devices may not support geomagnetic and we have to use only accelerometer data
-    because following to function will return zeroes
+    some devices may not support have magnetic_field sensor
+    i use only accelerometer data
 
     SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerReading, magnetometerReading)
     val orientation = SensorManager.getOrientation(rotationMatrix, orientationAngles)
 
-    i use Viktor original calculations
-    its hard to follow but here is some more explainations
-    https://stackoverflow.com/questions/38711705/android-device-orientation-without-geomagnetic
-
-    full description of a problem detecting pitch and roll using accelerometer sensor described here
-    https://www.nxp.com/files-static/sensors/doc/app_note/AN3461.pdf
-
     on my old xiaomi redmi go accelerometer sensor is not calibrated and at some point it never rich full gravity point
-    which genrates random misleading results in some positions. i devided to ignor z-dimension and only mesure x and y
-    which i quite phine for a camera level.
+    which generates random misleading results in some phone positions. it seems safer to use values 0 to g/2
 
+    to stay within safe values i use threshold values
 
-    Orientation can be decomposed in three Euler angle : Pitch, Roll and Azimuth.
-    With only accelerometer datas, you cannot compute your Azimuth, neither the sign of your pitch.
-    https://stackoverflow.com/questions/38711705/android-device-orientation-without-geomagnetic
-
-
+    the app supports both album and landscape phone orientation
  */
 
 class CameraHorizon_Overlay(private val sensorManager: SensorManager, private val sensor: Sensor, ctx: Context) : SensorEventListener {
@@ -80,6 +68,12 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
     private val mImageViewX: ImageView
     private val mlevelsquare: ImageView
     private val paintLine: Paint
+
+
+    private val paintCorrect: Paint
+    private val paintWrong: Paint
+
+
     var isCameraEnabled: Boolean
         private set
     private var tonePlayed: Boolean
@@ -94,19 +88,89 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
     private val orientationAngles = FloatArray(3)
 
 
-    private fun drawHorizonLevel(angle: Double) {
+    fun drawHorizonYawLevel(angle: Double){
+        val HorizonPitchThresholds = 2.0
+
+        var lpaint = paintCorrect
+        if(HorizonPitchThresholds < angle.absoluteValue) lpaint = paintWrong
+
+        drawCenterAngleLine(-angle,lpaint)
+        drawCenterAngleLine(180-angle,lpaint)
+    }
+
+    fun drawHorizonPitchLevel(angle: Double){
+        val Width = 300.0
+        val Height = 300.0
+        val Length = 100.0
+
+        val HorizonPitchThresholds = 3.0
+
+        var lpaint = paintCorrect
+        if(HorizonPitchThresholds < angle.absoluteValue) lpaint = paintWrong
+
+        val limit = 20.0
+        var langle = 0.0
+
+        if (limit < angle) langle = limit else langle = angle
+
+        val LineWidth: Int = 298
+
+        var startx = 1
+        var starty= (Height/2) - langle
+
+        canvasLevelSquare.drawLine(
+            (startx).toFloat(),
+            (starty - langle).toFloat(),
+            (startx+LineWidth).toFloat(),
+            (starty - langle).toFloat(),
+            lpaint
+        )
+    }
+
+    fun checkSpeed() : Boolean
+    {
+        // check ExosureSpeed - Speed should be at least 1/Focal length
+        // get camera focal lenth
+        // get camera current shutter speed
+        return true
+    }
+
+    // i am going to use this example for that
+    // https://github.com/tbouron/ShakeDetector/blob/master/library/src/main/java/com/github/tbouron/shakedetector/library/ShakeDetector.java
+    fun detectExcessiveShakiness()
+    {
+
+    }
+
+    // dont know how to use it yet.
+    fun CameraIsTooFar()
+    {
+
+    }
+
+    // dont know how to use it yet.
+    // https://ssaurel.medium.com/learn-to-create-a-luminosity-detector-application-on-android-c8c64726b2cb
+    fun OutsideLuminiousity()
+    {
+
+    }
+
+    private fun drawCenterAngleLine(angle: Double,lpaintLine : Paint) {
         val Width = 300
         val Height = 300
+        val Length = 100
 
         val handRadius: Int = 298
 
-        canvasLevelSquare.drawLine(
-            abs((sin(Math.toRadians(angle))* (Width/2)).toFloat()),
-            (((handRadius/2) + (sin(Math.toRadians(angle))* (handRadius/2))).toFloat()),
+        var startx = (Width/2)
+        var starty= (Height/2)
 
-            (Width - abs(sin(Math.toRadians(angle))* (Width/2))-1).toFloat(),
-            (((handRadius/2) - (sin(Math.toRadians(angle))* (handRadius/2)))-1).toFloat(),
-            paintLine
+        canvasLevelSquare.drawLine(
+            (startx).toFloat(),
+            (starty).toFloat(),
+            (startx+cos(Math.toRadians(angle))* (Width/2)).toFloat(),
+            (starty+sin(Math.toRadians(angle)) * (Height/2)).toFloat(),
+            lpaintLine
         )
     }
 
@@ -129,8 +193,8 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
             if (sensorEvent.values[0] > GRAVITY) GRAVITY else sensorEvent.values[0].toDouble()
         var gy =
             if (sensorEvent.values[1] > GRAVITY) GRAVITY else sensorEvent.values[1].toDouble()
-        var gz = sensorEvent.values[2].toDouble()
-        if (sensorEvent.values[2] > GRAVITY) GRAVITY else sensorEvent.values[2].toDouble()
+        var gz =
+            if (sensorEvent.values[2] > GRAVITY) GRAVITY else sensorEvent.values[2].toDouble()
 
         gx = if (gx < -GRAVITY) -GRAVITY else gx
         gy = if (gy < -GRAVITY) -GRAVITY else gy
@@ -144,28 +208,25 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
         /* calculations from https://wiki.dfrobot.com/How_to_Use_a_Three-Axis_Accelerometer_for_Tilt_Sensing */
 
         //Roll & Pitch are the angles which rotate by the axis X and y
-        var roll : Double = 0.00
         var pitch : Double = 0.00
+        var yaw : Double = 0.00
 
         var x_Buff : Float = gx.toFloat()
         var y_Buff : Float = gy.toFloat()
         var z_Buff : Float = gz.toFloat()
 
-        roll = round((atan2(y_Buff , z_Buff) * 57.3) * 100) / 100
-        pitch = round((atan2((0 - x_Buff) , sqrt(y_Buff * y_Buff + z_Buff * z_Buff)) * 57.3) * 100) / 100
+        pitch = round((atan2(y_Buff , z_Buff) * 57.3) * 100) / 100
+        yaw = round((atan2((0 - x_Buff) , sqrt(y_Buff * y_Buff + z_Buff * z_Buff)) * 57.3) * 100) / 100
+        //pitch = round((atan2((0 - x_Buff) , sqrt(y_Buff * y_Buff + z_Buff * z_Buff)) * 57.3) * 100) / 100
 
-
-
-     //   var roll2  = (atan2(-y_Buff, z_Buff)*180.0)/ PI;
-            var pitch2 = (atan2(x_Buff, sqrt(y_Buff*y_Buff + z_Buff*z_Buff))*180.0)/ PI;
 
 
         ssx.setText((x_Buff*100/100).toString())
         ssy.setText((y_Buff*100/100).toString())
         ssz.setText((z_Buff*100/100).toString())
 
-        spitch.setText((pitch*100/100).toString())
-        sroll.setText((roll*100/100).toString())
+        spitch.setText((yaw*100/100).toString())
+        sroll.setText((pitch*100/100).toString())
         syaw.setText((thetaZ*100/100).toString())
 
 
@@ -178,7 +239,9 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
         canvasY.drawRect(rectangleY, paintRectangle)
         canvasX.drawRect(rectangleX, paintRectangle)
         canvasLevelSquare.drawColor(Color.WHITE)
-        drawHorizonLevel(pitch)
+
+        drawHorizonYawLevel(yaw)
+        drawHorizonPitchLevel(thetaZ)
 
 // roll 90 pitch 0 - landscape orintation faceing horizon
         // roll 0 p 0 - facing bottom or sky
@@ -357,6 +420,21 @@ class CameraHorizon_Overlay(private val sensorManager: SensorManager, private va
         paintLine.color = Color.BLACK
         paintLine.isAntiAlias = true
         paintLine.strokeWidth = 2f
+
+        paintCorrect = Paint()
+        paintCorrect.style = Paint.Style.FILL
+        paintCorrect.color = Color.GREEN
+        paintCorrect.isAntiAlias = true
+        paintCorrect.strokeWidth = 3f
+
+        paintWrong = Paint()
+        paintWrong.style = Paint.Style.FILL
+        paintWrong.color = Color.RED
+        paintWrong.isAntiAlias = true
+        paintWrong.strokeWidth = 3f
+
+
+
         isCameraEnabled = false
         tonePlayed = false
         thetaX = 0.0
