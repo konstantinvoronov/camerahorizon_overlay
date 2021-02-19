@@ -13,13 +13,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BubbleLevelOverlayInAndroidCameraActivityKotlin">
         <activity
-            android:name="com.example.camerahorizon_overlay.CameraHorizonActivity"
+            android:name="com.example.camerahorizon_overlay.MainActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.BubbleLevelOverlayInAndroidCameraActivityKotlin.Fullscreen">
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
