@@ -11,9 +11,9 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.AudioManager
 import android.media.ToneGenerator
-import android.view.Surface
 import android.view.View
 import android.widget.ImageView
+import android.widget.TextView
 import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.round
@@ -21,30 +21,31 @@ import kotlin.math.sin
 
 
 /**
- * Created by Victor on 13/03/2019.
+ * Created by Voronov Konstantin
+ * me@konstantinvoronov.com
+ *
+ * CameraLevel_Overlay demonstrates how to make photography style HorizonLevel overlay using Accelerometer sensor ONLY
+ * App uses CameraX APIs and is written in Kotlin.
+ *
+ * Story: Google's current approach to determine phone position works only with both MagneticField and Accelerometer sensor
+ *
+ *  https://developer.android.com/guide/topics/sensors/sensors_position
+ *  Google documentation guides developers to use getRotationMatrix to get phone angles which requires magnetic senors readings
+ *
+ * SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerReading, magnetometerReading)
+ *
+ * Using two sensors for CameraLevel is an excessive approach and less universal
+ * Many cheap android phone yet lack magneticfield sensor and thus lack positioning feature
+ *
+ * CameraLevel_Overlay is a simple way to make photography style Horizontal level using only Accelerometer sensor
+
+* You can receive pitch roll and do custom thing
+* bubblelevel_overlay.setOnActionListener { pitch, roll -> }
+ *  or update CameraLevel_Overlay.update_ui to handle everything inside the class
+ *
+ *
  */
 
-/*
-   Kotlyn version updatedd by Konstantin Voronov on 10/02/2021
-   i update clean and made more up to date
-   updated it to use both magnetic and accelerometer code
-   using this kotlin
-   https://www.raywenderlich.com/10838302-sensors-tutorial-for-android-getting-started
-
-
-    some devices may not support have magnetic_field sensor
-    i use only accelerometer data
-
-    SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerReading, magnetometerReading)
-    val orientation = SensorManager.getOrientation(rotationMatrix, orientationAngles)
-
-    on my old xiaomi redmi go accelerometer sensor is not calibrated and at some point it never rich full gravity point
-    which generates random misleading results in some phone positions. it seems safer to use values 0 to g/2
-
-    to stay within safe values i use threshold values
-
-    the app supports both album and landscape phone orientation
- */
 
 class CameraLevel_Overlay(private val sensorManager: SensorManager, private val sensor: Sensor, ctx: Context) : SensorEventListener {
 
@@ -60,6 +61,7 @@ class CameraLevel_Overlay(private val sensorManager: SensorManager, private val 
     lateinit var p_activity : Activity
 
 
+    // tone is playd when angles become accaptable
     private var tonePlayed: Boolean
 
     private var x_angle: Double = 0.0
@@ -68,21 +70,29 @@ class CameraLevel_Overlay(private val sensorManager: SensorManager, private val 
 
     var gravity = FloatArray(3)
 
-    val phoneAngles: DoubleArray
-        get() = doubleArrayOf(x_angle, y_angle, z_angle)
+    val phonePitchYaw: DoubleArray
+        get() {
+            if (targetRotation == Configuration.ORIENTATION_PORTRAIT)
+                return doubleArrayOf(x_angle,z_angle)
+            return doubleArrayOf(y_angle,z_angle)
+        }
+    lateinit var OnActionListenerListener: (Double,Double) -> Unit
 
     var targetRotation : Int = Configuration.ORIENTATION_PORTRAIT
 
     companion object {
         private const val TAG = "CameraHorizonAngle"
         private const val GRAVITY = 9.81
-        private const val AcceptableYawLimits = 2.0
-        private const val AcceptablePitchLimits = 5.0
 
+        // green lines if within this limit
+        private const val AcceptableYawLimit = 2.0
+        private const val AcceptablePitchLimit = 5.0
 
-        val HorizonPitchThresholds = 20.0
-        val HorizonYawThresholds = 20.0
+        // lines stop move if above this Threshold
+        val HorizonPitchThreshold = 20.0
+        val HorizonYawThreshold = 20.0
 
+        // square size
         val horizonsquare_width = 300.0
         val horizonsquare_height = 300.0
         val horizonline_length = 100.0
@@ -90,7 +100,6 @@ class CameraLevel_Overlay(private val sensorManager: SensorManager, private val 
 
     init {
         mlevelsquare = (ctx as Activity).findViewById<View>(R.id.levelsquare) as ImageView
-
         toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
 
         bitmapLevelSquare = Bitmap.createBitmap(
@@ -128,23 +137,23 @@ class CameraLevel_Overlay(private val sensorManager: SensorManager, private val 
     fun drawHorizonYawLevel(angle: Double){
 
         var lpaint = paintWhenWhithinLimits
-        if(AcceptableYawLimits < angle.absoluteValue) lpaint = paintWhenAboveLimits
+        if(AcceptableYawLimit < angle.absoluteValue) lpaint = paintWhenAboveLimits
 
         var langle = angle
-        if (HorizonYawThresholds < angle && angle > 0) langle = HorizonYawThresholds
-        if (-HorizonYawThresholds > angle && angle < 0) langle = -HorizonYawThresholds
+        if (HorizonYawThreshold < angle && angle > 0) langle = HorizonYawThreshold
+        if (-HorizonYawThreshold > angle && angle < 0) langle = -HorizonYawThreshold
 
         drawCenterAngleLine(-langle,lpaint)
         drawCenterAngleLine(180-langle,lpaint)
     }
     fun drawHorizonPitchLevel(angle: Double){
         var lpaint = paintWhenWhithinLimits
-        if(AcceptablePitchLimits < angle.absoluteValue) lpaint = paintWhenAboveLimits
+        if(AcceptablePitchLimit < angle.absoluteValue) lpaint = paintWhenAboveLimits
 
         var langle = angle
 
-        if (HorizonPitchThresholds < angle && angle > 0) langle = HorizonPitchThresholds
-        if (-HorizonPitchThresholds > angle && angle < 0) langle = -HorizonPitchThresholds
+        if (HorizonPitchThreshold < angle && angle > 0) langle = HorizonPitchThreshold
+        if (-HorizonPitchThreshold > angle && angle < 0) langle = -HorizonPitchThreshold
 
         val LineWidth: Int = horizonsquare_width.toInt()
 
@@ -202,36 +211,29 @@ class CameraLevel_Overlay(private val sensorManager: SensorManager, private val 
         y_angle = round(Math.toDegrees(Math.asin(y_force / GRAVITY)) * 100) / 100
         z_angle = round(Math.toDegrees(Math.asin(z_force / GRAVITY)) * 100) / 100
 
+        if(::OnActionListenerListener.isInitialized)
+            OnActionListenerListener(phonePitchYaw[1],phonePitchYaw[0])
+
         update_ui()
     }
+
+    fun setOnActionListener(onActionListener: (pitch:Double,yaw:Double) -> Unit) {
+        OnActionListenerListener = onActionListener
+    }
+
 
     override fun onAccuracyChanged(sensor: Sensor, i: Int) {}
 
     fun update_ui()
     {
-        // show values
-//        ssx.setText((x_angle*100/100).toString())
-//        ssy.setText((y_angle*100/100).toString())
-//        ssz.setText((z_angle*100/100).toString())
-//
-//        spitch.setText((y_angle*100/100).toString())
-//        sroll.setText((x_angle*100/100).toString())
-//        syaw.setText((z_angle*100/100).toString())
 
         // clear the horizonsquare and drow lines
         canvasLevelSquare.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-        when (targetRotation)
-        {
-            Configuration.ORIENTATION_PORTRAIT -> {
-                drawHorizonYawLevel(-x_angle)
-            }
-            Configuration.ORIENTATION_LANDSCAPE -> {
-                drawHorizonYawLevel(-y_angle)
-            }
-        }
-        drawHorizonPitchLevel(z_angle)
+        drawHorizonPitchLevel(-phonePitchYaw[1])
+        drawHorizonYawLevel(-phonePitchYaw[0])
 
         // show the bitmap
-        mlevelsquare.setImageBitmap(bitmapLevelSquare)    }
+        mlevelsquare.setImageBitmap(bitmapLevelSquare)
+    }
 
 }

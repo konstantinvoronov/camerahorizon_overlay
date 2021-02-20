@@ -20,6 +20,31 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         />
+    <TextView
+        android:id="@+id/pitch_angle"
+        android:layout_width="92dp"
+        android:layout_height="92dp"
+        android:layout_marginRight="47dp"
+        android:text="80"
+        android:textAlignment="center"
+        android:textSize="40dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/camera_capture_button"
+        app:layout_constraintTop_toTopOf="parent"
+ />
 
+
+    <TextView
+        android:id="@+id/yaw_angle"
+        android:layout_width="92dp"
+        android:layout_height="92dp"
+        android:layout_marginRight="47dp"
+        android:text="80"
+        android:textAlignment="center"
+        android:textSize="40dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/camera_capture_button"
+ />
 </androidx.constraintlayout.widget.ConstraintLayout>
 
