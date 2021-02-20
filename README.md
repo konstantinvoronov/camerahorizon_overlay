@@ -17,3 +17,6 @@ CameraLevel_Overlay is a simple way to make photography style Horizontal level u
 You can receive pitch roll and do custom thing
 bubblelevel_overlay.setOnActionListener { pitch, roll -> }
 or update CameraLevel_Overlay.update_ui to handle everything inside the class
+
+Another good cameralevel overlay based on two sensors
+https://github.com/cyjack-blip/CameraLevel
