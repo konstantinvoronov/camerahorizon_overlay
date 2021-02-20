@@ -14,9 +14,12 @@ Using two sensors for CameraLevel is an excessive approach and less universal
 Many cheap android phone yet lack magneticfield sensor and thus lack positioning feature
 
 CameraLevel_Overlay is a simple way to make photography style Horizontal level using only Accelerometer sensor
-You can receive pitch roll and do custom thing
+
+You can receive pitch roll using
 bubblelevel_overlay.setOnActionListener { pitch, roll -> }
-or update CameraLevel_Overlay.update_ui to handle everything inside the class
+
+or update 
+CameraLevel_Overlay.update_ui to handle everything in class
 
 Another good cameralevel overlay based on two sensors
 https://github.com/cyjack-blip/CameraLevel
